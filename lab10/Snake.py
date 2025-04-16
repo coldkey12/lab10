@@ -1,3 +1,5 @@
+import math
+
 import pygame
 import random
 import time
@@ -20,6 +22,7 @@ white = (255, 255, 255)
 dis_width = 600
 dis_height = 400
 snake_block = 10
+snake_speed = 10
 
 pygame.init()
 display = pygame.display.set_mode((dis_width, dis_height))
@@ -82,7 +85,7 @@ def get_player_name():
     return name
 
 
-def save_score(player_name, score, duration):
+def save_score(player_name, score, level, duration):
     try:
         conn = psycopg2.connect(**DB_CONFIG)
         cursor = conn.cursor()
@@ -108,8 +111,8 @@ def save_score(player_name, score, duration):
             player_id = player_id[0]
 
         cursor.execute(
-            "INSERT INTO player_scores (player_id, score, game_duration) VALUES (%s, %s, %s)",
-            [player_id, score, duration]
+            "INSERT INTO player_scores (player_id, score, level, game_duration) VALUES (%s, %s, %s, %s)",
+            [player_id, score, level, duration]
         )
 
         conn.commit()
@@ -130,10 +133,10 @@ def show_high_scores():
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT p.player_name, ps.score, ps.game_duration 
+            SELECT p.player_name, ps.score, ps.level, ps.game_duration 
             FROM player_scores ps
             JOIN players p ON ps.player_id = p.player_id
-            ORDER BY ps.score DESC
+            ORDER BY ps.level DESC
             LIMIT 5
         """)
 
@@ -152,8 +155,8 @@ def display_scores(scores):
     message("HIGH SCORES", white, dis_width / 2 - 50, 30)
 
     y_offset = 70
-    for i, (name, score, duration) in enumerate(scores, 1):
-        message(f"{i}. {name}: {score} points ({duration}s)", white, dis_width / 4, y_offset)
+    for i, (name, score, level, duration) in enumerate(scores, 1):
+        message(f"{i}. {name}: {score} points ({duration}s), level: {level}", white, dis_width / 4, y_offset)
         y_offset += 30
 
     message("Good job", white, dis_width / 4, y_offset + 40)
@@ -180,6 +183,7 @@ def main():
     y1 = dis_height / 2
     x1_change = 0
     y1_change = 0
+    game_level = 1
 
     snake_list = []
     snake_length = 1
@@ -268,12 +272,18 @@ def main():
         message(f"Player: {player_name}", white, 10, 10)
         message(f"Score: {snake_length}", white, 10, 30)
         message(f"Time: {elapsed_time} sec", white, 10, 50)
+        message(f"Level: {game_level}", white, 10, 70)
         pygame.display.update()
-        clock.tick(15)
+        clock.tick(snake_speed + 0.2)
+
+        if snake_length%3 == 0:
+            game_level+=1
+            snake_length += 1
+            continue
 
     final_score = snake_length
     final_time = int(time.time() - start_time)
-    save_score(player_name, final_score, final_time)
+    save_score(player_name, final_score, game_level, final_time)
     show_high_scores()
 
     pygame.quit()
